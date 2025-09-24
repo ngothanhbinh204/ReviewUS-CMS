@@ -22,65 +22,86 @@ import BlogLayout from "./layout/BlogLayout";
 import BlogList from "./pages/Blog/BlogList";
 import CreateBlog from "./pages/Blog/CreateBlog";
 import EditBlog from "./pages/Blog/EditBlog";
+import Login from "./components/auth/Login";
+import { AuthProvider } from "./context/AuthContext";
+import { TenantProvider } from "./context/TenantContext";
+import TenantInitializer from "./components/common/TenantInitializer";
+import { QueryProvider } from "./providers/QueryProvider";
+// CMS Components
+import PostsList from "./components/cms/PostsList";
+import PostForm from "./components/cms/PostForm";
+import MediaListComponent from "./components/cms/MediaList";
+import TaxonomiesList from "./components/cms/TaxonomiesList";
+import CommentsList from "./components/cms/CommentsList";
+import TenantsList from "./components/cms/TenantsList";
 // import ViewBlog from "./pages/Blog/ViewBlog";
+
 export default function App() {
   return (
-    <>
-      <Router>
-        <ScrollToTop />
-        <Routes>
-          {/* Dashboard Layout */}
-          <Route element={<AppLayout />}>
-            <Route index path="/" element={<Home />} />
+    <QueryProvider>
+      <AuthProvider>
+        <TenantProvider>
+          <TenantInitializer>
+            <Router>
+              <ScrollToTop />
+              <Routes>
+            {/* Dashboard Layout */}
+            <Route element={<AppLayout />}>
+              <Route index path="/" element={<Home />} />
 
-            {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
+              {/* Others Page */}
+              <Route path="/profile" element={<UserProfiles />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/blank" element={<Blank />} />
 
-            {/* Forms */}
-            <Route path="/form-elements" element={<FormElements />} />
+              {/* Forms */}
+              <Route path="/form-elements" element={<FormElements />} />
 
-            {/* Tables */}
-            <Route path="/basic-tables" element={<BasicTables />} />
+              {/* Tables */}
+              <Route path="/basic-tables" element={<BasicTables />} />
 
-            {/* Blog */}
-            
-          {/* Blog Routes */}
-<Route path="/blog" element={<BlogLayout />}>
-  <Route index element={<BlogList />} /> {/* /blog */}
-  <Route path="create" element={<CreateBlog />} /> {/* /blog/create */}
-  <Route path="edit/:id" element={<EditBlog />} /> {/* /blog/edit/123 */}
-  {/* <Route path="view/:id" element={<ViewBlog />} /> 
-  <Route path="categories" element={<Categories />} />
-  <Route path="tags" element={<Tags />} />
-  <Route path="comments" element={<Comments />} />
-  <Route path="authors" element={<Authors />} />
-  <Route path="settings" element={<BlogSettings />} /> */}
-</Route>
+              {/* Blog Routes */}
+              <Route path="/blog" element={<BlogLayout />}>
+                <Route index element={<BlogList />} />
+                <Route path="create" element={<CreateBlog />} />
+                <Route path="edit/:id" element={<EditBlog />} />
+              </Route>
 
+              {/* CMS Routes - Integrated into main layout */}
+              <Route path="/cms/posts" element={<PostsList />} />
+              <Route path="/cms/posts/new" element={<PostForm type="post" mode="create" />} />
+              <Route path="/cms/posts/edit/:id" element={<PostForm type="post" mode="edit" />} />
+              <Route path="/cms/media" element={<MediaListComponent />} />
+              <Route path="/cms/categories" element={<TaxonomiesList type="category" />} />
+              <Route path="/cms/tags" element={<TaxonomiesList type="tag" />} />
+              <Route path="/cms/comments" element={<CommentsList />} />
+              <Route path="/cms/tenants" element={<TenantsList />} />
 
-            {/* Ui Elements */}
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
+              {/* Ui Elements */}
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/avatars" element={<Avatars />} />
+              <Route path="/badge" element={<Badges />} />
+              <Route path="/buttons" element={<Buttons />} />
+              <Route path="/images" element={<Images />} />
+              <Route path="/videos" element={<Videos />} />
 
-            {/* Charts */}
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
-          </Route>
+              {/* Charts */}
+              <Route path="/line-chart" element={<LineChart />} />
+              <Route path="/bar-chart" element={<BarChart />} />
+            </Route>
 
-          {/* Auth Layout */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+            {/* Auth Layout */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/signup" element={<SignUp />} />
 
-          {/* Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
-    </>
+            {/* Fallback Route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
+          </TenantInitializer>
+        </TenantProvider>
+      </AuthProvider>
+    </QueryProvider>
   );
 }

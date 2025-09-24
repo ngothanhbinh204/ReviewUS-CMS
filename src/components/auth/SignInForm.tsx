@@ -1,14 +1,59 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { useForm } from "react-hook-form";
+import { Link, useNavigate, Navigate } from "react-router";
+import { useAuth } from "../../context/AuthContext";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
-import Input from "../form/input/InputField";
-import Checkbox from "../form/input/Checkbox";
-import Button from "../ui/button/Button";
+import toast from "react-hot-toast";
+import ApiTestButton from "../common/ApiTestButton";
+
+interface LoginFormData {
+  email: string;
+  password: string;
+  keepLoggedIn: boolean;
+}
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
+  const { login, user, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    defaultValues: {
+      keepLoggedIn: false,
+    },
+  });
+
+  // Redirect if already logged in
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      console.log('Form submitted with:', { email: data.email });
+      await login(data.email, data.password);
+      toast.success('Đăng nhập thành công!');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Sign in form error:', error);
+      const errorMessage = error.message || 'Đăng nhập thất bại';
+      toast.error(errorMessage);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500"></div>
+        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col flex-1">
       <div className="w-full max-w-md pt-10 mx-auto">
@@ -83,22 +128,44 @@ export default function SignInForm() {
                 </span>
               </div>
             </div>
-            <form>
+            <form onSubmit={handleSubmit(onSubmit)}>
               <div className="space-y-6">
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com" />
+                  <input
+                    type="email"
+                    {...register('email', {
+                      required: 'Email is required',
+                      pattern: {
+                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        message: 'Invalid email address',
+                      },
+                    })}
+                    placeholder="info@gmail.com"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-error-600 mt-1">{errors.email.message}</p>
+                  )}
                 </div>
                 <div>
                   <Label>
                     Password <span className="text-error-500">*</span>{" "}
                   </Label>
                   <div className="relative">
-                    <Input
+                    <input
                       type={showPassword ? "text" : "password"}
+                      {...register('password', {
+                        required: 'Password is required',
+                        minLength: {
+                          value: 6,
+                          message: 'Password must be at least 6 characters',
+                        },
+                      })}
                       placeholder="Enter your password"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent dark:bg-gray-700 dark:text-white pr-12"
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -111,10 +178,17 @@ export default function SignInForm() {
                       )}
                     </span>
                   </div>
+                  {errors.password && (
+                    <p className="text-sm text-error-600 mt-1">{errors.password.message}</p>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Checkbox checked={isChecked} onChange={setIsChecked} />
+                    <input
+                      type="checkbox"
+                      {...register('keepLoggedIn')}
+                      className="h-4 w-4 text-brand-600 focus:ring-brand-500 border-gray-300 rounded"
+                    />
                     <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
                       Keep me logged in
                     </span>
@@ -127,9 +201,13 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm">
-                    Sign in
-                  </Button>
+                  <button 
+                    type="submit"
+                    className="w-full bg-brand-500 hover:bg-brand-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'Signing in...' : 'Sign in'}
+                  </button>
                 </div>
               </div>
             </form>
@@ -145,6 +223,13 @@ export default function SignInForm() {
                 </Link>
               </p>
             </div>
+            
+            {/* API Test Button - Only show in development */}
+            {import.meta.env.DEV && (
+              <div className="mt-5">
+                <ApiTestButton />
+              </div>
+            )}
           </div>
         </div>
       </div>

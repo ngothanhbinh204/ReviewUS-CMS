@@ -60,6 +60,18 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    name: "CMS",
+    icon: <BoxCubeIcon />,
+    subItems: [
+      { name: "Posts", path: "/cms/posts", pro: false },
+      { name: "Media Library", path: "/cms/media", pro: false },
+      { name: "Categories", path: "/cms/categories", pro: false },
+      { name: "Tags", path: "/cms/tags", pro: false },
+      { name: "Comments", path: "/cms/comments", pro: false },
+      { name: "Tenants", path: "/cms/tenants", pro: true },
+    ],
+  },
+  {
     name: "Pages",
     icon: <PageIcon />,
     subItems: [
