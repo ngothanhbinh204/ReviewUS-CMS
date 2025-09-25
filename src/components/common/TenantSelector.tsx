@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
+import { tenantService } from '../../services/tenantService';
 
 const TenantSelector: React.FC = () => {
   const { currentTenant, availableTenants, switchTenant, isLoading } = useTenant();
@@ -9,31 +10,29 @@ const TenantSelector: React.FC = () => {
 
   const handleTenantSelect = async (tenantId: string) => {
     try {
-      await switchTenant(tenantId);
-
-      // Call API to get new accessToken
-      const response = await fetch('/api/Auth/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ tenantId }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch new access token');
+      console.log('Selecting tenant:', tenantId);
+      
+      // Use tenant service to select tenant and get new token
+      const result = await tenantService.selectTenant(tenantId);
+      
+      console.log('Tenant selection result:', result);
+      
+      if (result.accessToken) {
+        console.log('Updating access token:', result.accessToken);
+        // Update accessToken in AuthContext and Local Storage
+        updateAccessToken(result.accessToken);
+        localStorage.setItem('token', result.accessToken);
+      } else {
+        console.warn('No access token returned from select tenant API');
       }
 
-      const data = await response.json();
-      const newAccessToken = data.accessToken;
-
-      // Update accessToken in AuthContext and Local Storage
-      updateAccessToken(newAccessToken);
-      localStorage.setItem('accessToken', newAccessToken);
+      // Update tenant context
+      await switchTenant(tenantId);
 
       setIsOpen(false);
     } catch (error) {
       console.error('Failed to switch tenant:', error);
+      // Don't close dropdown on error so user can try again
     }
   };
 

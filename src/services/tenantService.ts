@@ -18,10 +18,10 @@ export interface TenantResponse {
 }
 
 class TenantService {
-  // Get all available tenants
+  // Get all available tenants (my tenants)
   async getAvailableTenants(): Promise<Tenant[]> {
     try {
-      const response = await apiClient.get<TenantResponse>('Test/tenants');
+      const response = await apiClient.get<TenantResponse>('TenantSelector/my-tenants');
       if (response.data.success) {
         console.log('Fetched tenants:', response.data.data);
         return response.data.data;
@@ -29,6 +29,69 @@ class TenantService {
       throw new Error(response.data.message);
     } catch (error) {
       console.error('Failed to fetch tenants:', error);
+      throw error;
+    }
+  }
+
+  // Get current tenant from API
+  async getCurrentTenantFromAPI(): Promise<Tenant | null> {
+    try {
+      const response = await apiClient.get<{ success: boolean; data: Tenant }>('TenantSelector/current-tenant');
+      if (response.data.success) {
+        return response.data.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch current tenant:', error);
+      return null;
+    }
+  }
+
+  // Select tenant and get new token
+  async selectTenant(tenantId: string): Promise<{ tenant: Tenant; accessToken?: string }> {
+    try {
+      const response = await apiClient.post('TenantSelector/select-tenant', { tenantId });
+      
+      console.log('Select tenant API response:', response.data);
+      
+      // Handle different response structures
+      let responseData = response.data;
+      
+      // If response has a 'data' property, use that
+      if (responseData.data) {
+        responseData = responseData.data;
+      }
+      
+      // Extract tenant and token information
+      const tenant = responseData.tenant;
+      const newToken = responseData.accessToken || responseData.token;
+      
+      console.log('Extracted tenant:', tenant);
+      console.log('Extracted token:', newToken);
+      
+      if (tenant && tenant.id) {
+        // Update localStorage with new tenant info
+        this.setCurrentTenant(tenant);
+      } else {
+        console.warn('Tenant information not found in response, using tenantId to create minimal tenant');
+        // Create minimal tenant object if not provided
+        const minimalTenant: Tenant = {
+          id: tenantId,
+          slug: '',
+          domain: '',
+          createdAt: new Date().toISOString()
+        };
+        this.setCurrentTenant(minimalTenant);
+      }
+      
+      return { 
+        tenant: tenant || { id: tenantId, slug: '', domain: '', createdAt: new Date().toISOString() }, 
+        accessToken: newToken 
+      };
+      
+    } catch (error: any) {
+      console.error('Failed to select tenant:', error);
+      console.error('Error details:', error.response?.data);
       throw error;
     }
   }
@@ -75,17 +138,12 @@ class TenantService {
   // Switch tenant
   async switchTenant(tenantId: string): Promise<void> {
     try {
-      const tenants = await this.getAvailableTenants();
-      const tenant = tenants.find(t => t.id === tenantId);
+      const result = await this.selectTenant(tenantId);
       
-      if (!tenant) {
-        throw new Error('Tenant not found');
-      }
+      // If we got a new token, it should be handled by the calling component
+      // The tenant info is already saved in selectTenant method
       
-      this.setCurrentTenant(tenant);
-      
-      // Refresh the page to apply new tenant context
-      window.location.reload();
+      console.log('Tenant switched successfully:', result.tenant);
     } catch (error) {
       console.error('Failed to switch tenant:', error);
       throw error;

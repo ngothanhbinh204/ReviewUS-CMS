@@ -13,7 +13,7 @@ const CmsDashboard: React.FC = () => {
   const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/signin" replace />;
   }
 
   const navigation = [

@@ -311,9 +311,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Call API logout to invalidate token on server
+      await authApi.logout();
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with local logout even if API fails
+    }
+    
+    // Clear all auth-related data from localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('currentTenant');
+    localStorage.removeItem('current_tenant');
+    localStorage.removeItem('current_tenant_id');
+    localStorage.removeItem('current_tenant_slug');
+    
+    // Clear tenant state
+    setCurrentTenantState(null);
+    
+    // Dispatch logout action
     dispatch({ type: 'AUTH_LOGOUT' });
   };
 

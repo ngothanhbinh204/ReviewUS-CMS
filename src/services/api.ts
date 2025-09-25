@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/apiConfig';
 import {
   USE_MOCK_API,
   mockAuthApi,
@@ -8,9 +9,6 @@ import {
   mockCommentsApi,
   mockTenantsApi,
 } from './mockApi';
-
-// API base configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -78,13 +76,34 @@ apiClient.interceptors.response.use(
 // Auth API
 export const authApi = USE_MOCK_API ? mockAuthApi : {
   login: (credentials: { email: string; password: string }) =>
-    apiClient.post('/Users/login', credentials),
+    apiClient.post('/auth/login', credentials),
   
   register: (data: { email: string; password: string; name: string }) =>
-    apiClient.post('/Users/register', data),
+    apiClient.post('/auth/register', data),
     
   getCurrentUser: () =>
-    apiClient.get('/Users/profile'),
+    apiClient.get('/auth/profile'),
+    
+  refresh: () =>
+    apiClient.post('/auth/refresh'),
+    
+  logout: () => {
+    // Get user data from localStorage to extract userId
+    const userData = localStorage.getItem('user');
+    let userId = null;
+    
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        userId = user.id || user.userId;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+    
+    // Send userId in request body
+    return apiClient.post('/auth/logout', { userId });
+  },
 };
 
 // Posts API
@@ -213,6 +232,18 @@ export const tenantsApi = USE_MOCK_API ? mockTenantsApi : {
     
   delete: (id: string) =>
     apiClient.delete(`Test/tenants/${id}`),
+};
+
+// Tenant Selector API
+export const tenantSelectorApi = {
+  getMyTenants: () =>
+    apiClient.get('/TenantSelector/my-tenants'),
+    
+  selectTenant: (tenantId: string) =>
+    apiClient.post('/TenantSelector/select-tenant', { tenantId }),
+    
+  getCurrentTenant: () =>
+    apiClient.get('/TenantSelector/current-tenant'),
 };
 
 export default apiClient;

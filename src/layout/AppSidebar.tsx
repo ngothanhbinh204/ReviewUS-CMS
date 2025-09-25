@@ -60,15 +60,37 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    name: "Media Management",
+    icon: <BoxCubeIcon />,
+    subItems: [
+      { name: "Media Library", path: "/media", pro: false },
+      { name: "Analytics", path: "/media/analytics", pro: true },
+      { name: "Shared Media", path: "/media/shared", pro: false },
+    ],
+  },
+  {
     name: "CMS",
     icon: <BoxCubeIcon />,
     subItems: [
-      { name: "Posts", path: "/cms/posts", pro: false },
-      { name: "Media Library", path: "/cms/media", pro: false },
-      { name: "Categories", path: "/cms/categories", pro: false },
-      { name: "Tags", path: "/cms/tags", pro: false },
       { name: "Comments", path: "/cms/comments", pro: false },
       { name: "Tenants", path: "/cms/tenants", pro: true },
+    ],
+  },
+  {
+    name: "Posts Management", 
+    icon: <PageIcon />,
+    subItems: [
+      { name: "All Posts", path: "/posts", pro: false },
+      { name: "Create New", path: "/posts/new", pro: false },
+      { name: "Analytics", path: "/posts/analytics", pro: true, new: true },
+    ],
+  },
+  {
+    name: "Taxonomies",
+    icon: <ListIcon />,
+    subItems: [
+      { name: "Categories", path: "/cms/categories", pro: false },
+      { name: "Tags", path: "/cms/tags", pro: false },
     ],
   },
   {

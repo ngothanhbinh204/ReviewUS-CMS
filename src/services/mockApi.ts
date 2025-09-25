@@ -39,6 +39,18 @@ export const mockAuthApi = {
     await mockDelay();
     return createMockSingleResponse(mockUser);
   },
+
+  refresh: async () => {
+    await mockDelay();
+    const token = 'mock-jwt-token-refreshed-' + Date.now();
+    return createMockSingleResponse({ token });
+  },
+
+  logout: async () => {
+    await mockDelay();
+    localStorage.removeItem('token');
+    return createMockSingleResponse({ message: 'Logged out successfully' });
+  },
 };
 
 // Mock Posts API

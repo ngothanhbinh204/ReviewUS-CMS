@@ -17,9 +17,16 @@ export default function UserDropdown() {
     setIsOpen(false);
   }
 
-  function handleSignOut() {
-    logout();
-    navigate('/signin');
+  async function handleSignOut() {
+    try {
+      console.log('Signing out...');
+      await logout(); // This now calls the API and clears localStorage
+      navigate('/signin', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still navigate to signin even if logout API fails
+      navigate('/signin', { replace: true });
+    }
   }
   return (
     <div className="relative">

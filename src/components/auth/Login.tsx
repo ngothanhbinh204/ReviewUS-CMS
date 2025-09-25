@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 
 interface LoginFormData {
   email: string;
@@ -11,6 +11,9 @@ interface LoginFormData {
 
 const Login: React.FC = () => {
   const { login, user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const {
     register,
     handleSubmit,
@@ -19,13 +22,17 @@ const Login: React.FC = () => {
 
   // Redirect if already logged in
   if (user) {
-    return <Navigate to="/cms" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       await login(data.email, data.password);
       toast.success('Login successful');
+      
+      // Redirect to the page user was trying to access, or home page
+      const from = (location.state as any)?.from?.pathname || '/';
+      navigate(from, { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Login failed');
     }

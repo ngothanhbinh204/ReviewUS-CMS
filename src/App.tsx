@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -22,7 +22,8 @@ import BlogLayout from "./layout/BlogLayout";
 import BlogList from "./pages/Blog/BlogList";
 import CreateBlog from "./pages/Blog/CreateBlog";
 import EditBlog from "./pages/Blog/EditBlog";
-import Login from "./components/auth/Login";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PublicRoute from "./components/auth/PublicRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { TenantProvider } from "./context/TenantContext";
 import TenantInitializer from "./components/common/TenantInitializer";
@@ -34,6 +35,13 @@ import MediaListComponent from "./components/cms/MediaList";
 import TaxonomiesList from "./components/cms/TaxonomiesList";
 import CommentsList from "./components/cms/CommentsList";
 import TenantsList from "./components/cms/TenantsList";
+
+// New Post CRUD Components
+import PostsPage from "./pages/PostsPage";
+import PostAnalyticsPage from "./pages/PostAnalyticsPage";
+
+// Media Management Components
+import { MediaManagementPage } from "./pages/Media";
 // import ViewBlog from "./pages/Blog/ViewBlog";
 
 export default function App() {
@@ -45,8 +53,12 @@ export default function App() {
             <Router>
               <ScrollToTop />
               <Routes>
-            {/* Dashboard Layout */}
-            <Route element={<AppLayout />}>
+            {/* Protected Dashboard Layout */}
+            <Route element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }>
               <Route index path="/" element={<Home />} />
 
               {/* Others Page */}
@@ -77,6 +89,13 @@ export default function App() {
               <Route path="/cms/comments" element={<CommentsList />} />
               <Route path="/cms/tenants" element={<TenantsList />} />
 
+              {/* Posts CRUD with Revision System */}
+              <Route path="/posts/*" element={<PostsPage />} />
+              <Route path="/posts/analytics" element={<PostAnalyticsPage />} />
+
+              {/* Media Management System */}
+              <Route path="/media/*" element={<MediaManagementPage />} />
+
               {/* Ui Elements */}
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/avatars" element={<Avatars />} />
@@ -90,10 +109,20 @@ export default function App() {
               <Route path="/bar-chart" element={<BarChart />} />
             </Route>
 
-            {/* Auth Layout */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
+            {/* Public Auth Routes */}
+            <Route path="/signin" element={
+              <PublicRoute>
+                <SignIn />
+              </PublicRoute>
+            } />
+            <Route path="/signup" element={
+              <PublicRoute>
+                <SignUp />
+              </PublicRoute>
+            } />
+
+            {/* Redirect /login to /signin for backward compatibility */}
+            <Route path="/login" element={<Navigate to="/signin" replace />} />
 
             {/* Fallback Route */}
             <Route path="*" element={<NotFound />} />
