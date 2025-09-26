@@ -31,6 +31,26 @@ apiClient.interceptors.request.use(
     const tenantSlug = localStorage.getItem('current_tenant_slug');
     
     if (tenantId) {
+      config.headers['X-Tenant-Id'] = tenantId;
+    }
+    if (tenantSlug) {
+      config.headers['X-Tenant-Slug'] = tenantSlug;
+    }
+
+    // Add cache busting headers if explicitly requested
+    if (config.headers['X-Force-Refresh']) {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+      
+      // Add timestamp to query params for cache busting
+      config.params = {
+        ...config.params,
+        _t: Date.now()
+      };
+    }
+    
+    if (tenantId) {
       config.headers['X-Tenant-ID'] = tenantId;
     }
     

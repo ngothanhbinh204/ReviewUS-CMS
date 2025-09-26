@@ -40,14 +40,19 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
   // FETCH MEDIA LIST
   // =================================================================
   
-  const fetchMedia = useCallback(async (params?: MediaQueryParams) => {
+  const fetchMedia = useCallback(async (params?: MediaQueryParams, forceRefresh = false) => {
     setState(prev => ({ ...prev, loading: 'loading', error: null }));
     
     try {
-      const response = await mediaService.getMedia({
-        ...state.filters,
-        ...params
-      }) as any; // Use any to handle actual API response structure
+      const response = forceRefresh 
+        ? await mediaService.getMediaFresh({
+            ...state.filters,
+            ...params
+          }) as any
+        : await mediaService.getMedia({
+            ...state.filters,
+            ...params
+          }) as any; // Use any to handle actual API response structure
 
       console.log('MediaService response:', response); // Debug log
 
@@ -218,6 +223,9 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
             totalCount: prev.pagination.totalCount - 1
           }
         }));
+        
+        // Force refresh to ensure server state sync
+        setTimeout(() => fetchMedia(state.filters, true), 100);
       } else {
         throw new Error(response.message || 'Delete failed');
       }
@@ -225,7 +233,7 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
       setState(prev => ({ ...prev, error: error.message }));
       throw error;
     }
-  }, []);
+  }, [state.filters, fetchMedia]);
 
   // =================================================================
   // BULK DELETE
@@ -246,6 +254,9 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
           }
         }));
         
+        // Force refresh to ensure server state sync
+        setTimeout(() => fetchMedia(state.filters, true), 100);
+        
         return response.data;
       } else {
         throw new Error(response.message || 'Bulk delete failed');
@@ -254,7 +265,7 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
       setState(prev => ({ ...prev, error: error.message }));
       throw error;
     }
-  }, []);
+  }, [state.filters, fetchMedia]);
 
   // =================================================================
   // SELECTION MANAGEMENT
@@ -353,7 +364,8 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
     resetFilters,
     
     // Utility
-    refresh: () => fetchMedia(state.filters)
+    refresh: () => fetchMedia(state.filters),
+    forceRefresh: () => fetchMedia(state.filters, true)
   };
 };
 

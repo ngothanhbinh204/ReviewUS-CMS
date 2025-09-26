@@ -13,7 +13,7 @@ export interface PostDto {
   destinationId?: string;
   destination?: DestinationDto;
   featuredImageId?: string;
-  featuredImage?: MediaDto;
+  featuredImageUrl?: MediaDto;
   seoMeta?: SeoMetaDto;
   schemaMarkup?: any;
   structuredData?: any;
@@ -57,7 +57,7 @@ export interface PostListDto {
   publishAt?: string;
   authorId: string;
   author?: UserDto;
-  featuredImage?: MediaDto;
+  featuredImageUrl?: MediaDto;
   createdAt: string;
   updatedAt: string;
   viewCount?: number;
@@ -193,12 +193,6 @@ export interface SeoMetaDto {
   title?: string;
   description?: string;
   keywords?: string[];
-  ogTitle?: string;
-  ogDescription?: string;
-  ogImage?: string;
-  twitterTitle?: string;
-  twitterDescription?: string;
-  twitterImage?: string;
 }
 
 export interface SeoComparisonDto {

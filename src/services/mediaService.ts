@@ -52,6 +52,19 @@ export class MediaService {
   }
 
   /**
+   * Get paginated media list with cache busting for fresh data
+   */
+  async getMediaFresh(params?: MediaQueryParams): Promise<PagedApiResponse<MediaDto>> {
+    const response = await apiClient.get<PagedApiResponse<MediaDto>>(this.baseUrl, { 
+      params,
+      headers: {
+        'X-Force-Refresh': 'true'
+      }
+    });
+    return response.data;
+  }
+
+  /**
    * Get single media by ID
    */
   async getMediaById(id: string): Promise<ApiResponse<MediaDto>> {

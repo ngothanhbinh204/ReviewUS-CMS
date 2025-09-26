@@ -42,6 +42,11 @@ import PostAnalyticsPage from "./pages/PostAnalyticsPage";
 
 // Media Management Components
 import { MediaManagementPage } from "./pages/Media";
+
+// Destinations Management Components
+import DestinationList from "./components/destinations/DestinationList";
+import DestinationForm from "./components/destinations/DestinationForm";
+
 // import ViewBlog from "./pages/Blog/ViewBlog";
 
 export default function App() {
@@ -95,6 +100,11 @@ export default function App() {
 
               {/* Media Management System */}
               <Route path="/media/*" element={<MediaManagementPage />} />
+
+              {/* Destinations Management */}
+              <Route path="/destinations" element={<DestinationList />} />
+              <Route path="/destinations/new" element={<DestinationForm />} />
+              <Route path="/destinations/:id/edit" element={<DestinationForm />} />
 
               {/* Ui Elements */}
               <Route path="/alerts" element={<Alerts />} />

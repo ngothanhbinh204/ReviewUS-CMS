@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { postService } from '../../services/postService';
 import { PostListDto, PostQueryParams } from '../../types/post.types';
+import { Edit, RefreshCw, CheckCircle, XCircle, Trash2 } from "lucide-react";
 
 const PostsList: React.FC = () => {
   const [posts, setPosts] = useState<PostListDto[]>([]);
@@ -222,11 +223,11 @@ const PostsList: React.FC = () => {
                 <tr key={post.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      {post.featuredImage && (
+                      {post.featuredImageUrl && (
                         <img 
-                          src={post.featuredImage.url} 
-                          alt={post.featuredImage.alt}
-                          className="h-12 w-12 rounded-lg object-cover mr-4"
+                          src={post.featuredImageUrl} 
+                          alt={post.featuredImageUrl.caption || 'Featured'}
+                          className="h-12 w-20 rounded-lg object-cover mr-4"
                         />
                       )}
                       <div>
@@ -259,36 +260,47 @@ const PostsList: React.FC = () => {
                     {formatRelativeTime(post.createdAt)}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        to={`/posts/${post.id}/edit`}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        Edit
-                      </Link>
-                      <Link
-                        to={`/posts/${post.id}/revisions`}
-                        className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                      >
-                        Revisions
-                      </Link>
-                      <button
-                        onClick={() => handlePublishToggle(post)}
-                        className={`${
-                          post.status === 'published' 
-                            ? 'text-yellow-600 hover:text-yellow-700 dark:text-yellow-400' 
-                            : 'text-green-600 hover:text-green-700 dark:text-green-400'
-                        }`}
-                      >
-                        {post.status === 'published' ? 'Unpublish' : 'Publish'}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(post.id)}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                   <div className="flex items-center gap-2 lg:gap-4">
+                    {/* Edit */}
+                    <Link
+                      to={`/posts/${post.id}/edit`}
+                      className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                      title="Edit"
+                    >
+                      <Edit size={20} />
+                    </Link>
+
+                    {/* Revisions */}
+                    <Link
+                      to={`/posts/${post.id}/revisions`}
+                      className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                      title="Revisions"
+                    >
+                      <RefreshCw size={20} />
+                    </Link>
+
+                    {/* Publish / Unpublish */}
+                    <button
+                      onClick={() => handlePublishToggle(post)}
+                      className={`${
+                        post.status === 'published'
+                          ? 'text-yellow-600 hover:text-yellow-700 dark:text-yellow-400'
+                          : 'text-green-600 hover:text-green-700 dark:text-green-400'
+                      }`}
+                      title={post.status === 'published' ? 'Unpublish' : 'Publish'}
+                    >
+                      {post.status === 'published' ? <XCircle size={20} /> : <CheckCircle size={20} />}
+                    </button>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      title="Delete"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                   </td>
                 </tr>
               ))}

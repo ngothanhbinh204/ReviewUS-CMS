@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { postService } from '../../services/postService';
 import { Save, Rocket, FileEdit, Image } from "lucide-react";
-import HTMLEditor from '../common/HTMLEditor';
-import ImageManager from '../media/ImageManager';
+import ContentEditor from '../common/ContentEditor';
+import { FeaturedImagePicker } from '../common/FeaturedImagePicker';
+import { KeywordInput } from '../common/KeywordInput';
+import { MediaPickerModal } from '../media/MediaPickerModal';
+import { MediaDto } from '../../types/media.types';
+import { tenantService, Tenant } from '../../services/tenantService';
+import { destinationService } from '../../services/destinationService';
+import { DestinationListDto } from '../../types/destination.types';
 
 import { CreatePostDto, UpdatePostDto, SeoMetaDto } from '../../types/post.types';
 
@@ -28,13 +34,7 @@ const PostForm: React.FC = () => {
     seoMeta: {
       title: '',
       description: '',
-      keywords: [],
-      ogTitle: '',
-      ogDescription: '',
-      ogImage: '',
-      twitterTitle: '',
-      twitterDescription: '',
-      twitterImage: ''
+      keywords: []
     }
   });
 
@@ -44,13 +44,75 @@ const PostForm: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [editorMode, setEditorMode] = useState<'visual' | 'html'>('visual');
-  const [showImageManager, setShowImageManager] = useState(false);
+  const [showFeaturedImagePicker, setShowFeaturedImagePicker] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [featuredImage, setFeaturedImage] = useState<MediaDto | null>(null);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [destinations, setDestinations] = useState<DestinationListDto[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
+  // Load initial data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // Load current user
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          setCurrentUser(user);
+          // Check if user is admin (super_admin role or similar)
+          const isUserAdmin = user.roles.includes("super_admin") || user.roles.includes("Admin");
+          setIsAdmin(isUserAdmin);
+          
+          // If admin, load available tenants
+          if (isUserAdmin) {
+            try {
+              const availableTenants = await tenantService.getAvailableTenants();
+              setTenants(availableTenants);
+
+              // Set current tenant as selected
+              const currentTenantId = tenantService.getCurrentTenantId();
+              if (currentTenantId) {
+                setSelectedTenantId(currentTenantId);
+              }
+            } catch (error) {
+              console.error('Failed to load tenants:', error);
+            }
+          } 
+        }
+        
+        // Load destinations
+        try {
+          const destinationsResponse = await destinationService.getDestinations();
+          if (destinationsResponse.data) {
+            setDestinations(destinationsResponse.data);
+          }
+        } catch (error) {
+          console.error('Failed to load destinations:', error);
+        }
+        
+        // Load post data if editing - always force refresh to avoid cache issues
+        if (isEdit && id) {
+          console.log('Edit mode detected, force refreshing post data for ID:', id);
+          await fetchPost(id);
+        }
+      } catch (error) {
+        console.error('Failed to load initial data:', error);
+      }
+    };
+
+    loadInitialData();
+  }, [id, isEdit]);
+
+  // Additional effect to handle navigation changes and force refresh
   useEffect(() => {
     if (isEdit && id) {
+      console.log('Post ID changed, refreshing data for:', id);
       fetchPost(id);
     }
-  }, [id, isEdit]);
+  }, [id]);
 
   const fetchPost = async (postId: string) => {
     try {
@@ -58,7 +120,8 @@ const PostForm: React.FC = () => {
       setError(null);
       console.log('Fetching post with ID:', postId);
       
-      const response = await postService.getPost(postId);
+      // Force fresh data to avoid cache issues
+      const response = await postService.getPost(postId, { forceRefresh: true });
       console.log('API Response:', response);
       
       const postData = response.data;
@@ -69,13 +132,7 @@ const PostForm: React.FC = () => {
         let parsedSeoMeta = {
           title: '',
           description: '',
-          keywords: [],
-          ogTitle: '',
-          ogDescription: '',
-          ogImage: '',
-          twitterTitle: '',
-          twitterDescription: '',
-          twitterImage: ''
+          keywords: []
         };
 
         if (postData.seoMeta) {
@@ -83,7 +140,7 @@ const PostForm: React.FC = () => {
             // If seoMeta is a string, parse it
             if (typeof postData.seoMeta === 'string') {
               // Handle double-escaped JSON string
-              let cleanJsonString = postData.seoMeta;
+              let cleanJsonString: string = postData.seoMeta;
               
               // Remove outer quotes and unescape
               if (cleanJsonString.startsWith('"') && cleanJsonString.endsWith('"')) {
@@ -100,27 +157,14 @@ const PostForm: React.FC = () => {
                 title: parsed.title || '',
                 description: parsed.description || '',
                 keywords: Array.isArray(parsed.keywords) ? parsed.keywords : 
-                         (typeof parsed.keywords === 'string' ? parsed.keywords.split(',').map((k: string) => k.trim()) : []),
-                ogTitle: parsed.ogTitle || '',
-                ogDescription: parsed.ogDescription || '',
-                ogImage: parsed.ogImage || '',
-                twitterTitle: parsed.twitterTitle || '',
-                twitterDescription: parsed.twitterDescription || '',
-                twitterImage: parsed.twitterImage || ''
+                         (typeof parsed.keywords === 'string' ? parsed.keywords.split(',').map((k: string) => k.trim()) : [])
               };
-            } else if (typeof postData.seoMeta === 'object') {
+            } else if (typeof postData.seoMeta === 'object' && postData.seoMeta !== null) {
               // If it's already an object, use it directly
               parsedSeoMeta = {
-                title: postData.seoMeta.title || '',
-                description: postData.seoMeta.description || '',
-                keywords: Array.isArray(postData.seoMeta.keywords) ? postData.seoMeta.keywords : 
-                         (typeof postData.seoMeta.keywords === 'string' ? postData.seoMeta.keywords.split(',').map((k: string) => k.trim()) : []),
-                ogTitle: postData.seoMeta.ogTitle || '',
-                ogDescription: postData.seoMeta.ogDescription || '',
-                ogImage: postData.seoMeta.ogImage || '',
-                twitterTitle: postData.seoMeta.twitterTitle || '',
-                twitterDescription: postData.seoMeta.twitterDescription || '',
-                twitterImage: postData.seoMeta.twitterImage || ''
+                title: (postData.seoMeta as any).title || '',
+                description: (postData.seoMeta as any).description || '',
+                keywords: Array.isArray((postData.seoMeta as any).keywords) ? (postData.seoMeta as any).keywords : []
               };
             }
           } catch (parseError) {
@@ -135,7 +179,9 @@ const PostForm: React.FC = () => {
           excerpt: postData.excerpt || '',
           body: postData.body || '', // Keep HTML as is for CKEditor
           status: postData.status,
-          publishAt: postData.publishAt || '',
+          publishAt: postData.publishAt && postData.publishAt !== '' 
+            ? new Date(postData.publishAt).toISOString() 
+            : '',
           destinationId: postData.destinationId || '',
           featuredImageId: postData.featuredImageId || '',
           canonicalUrl: postData.canonicalUrl || '',
@@ -146,6 +192,8 @@ const PostForm: React.FC = () => {
         };
         
         console.log('Setting post state:', newPostState);
+        console.log('Post body content:', postData.body);
+        console.log('Post body length:', (postData.body || '').length);
         setPost(newPostState);
         
         // Force editor re-render to load new content
@@ -183,6 +231,12 @@ const PostForm: React.FC = () => {
 
   const validateForm = (): boolean => {
     const errors = postService.validatePost(post);
+    
+    // Add admin tenant validation
+    if (isAdmin && !selectedTenantId) {
+      errors.push('Please select a target tenant for this post');
+    }
+    
     setValidationErrors(errors);
     return errors.length === 0;
   };
@@ -192,10 +246,45 @@ const PostForm: React.FC = () => {
 
     try {
       setSaving(true);
+      
+      // If admin selected a different tenant, switch context temporarily
+      let originalTenant = null;
+      if (isAdmin && selectedTenantId && selectedTenantId !== tenantService.getCurrentTenantId()) {
+        originalTenant = tenantService.getCurrentTenant();
+        await tenantService.selectTenant(selectedTenantId);
+      }
+
       const postData = { ...post };
       if (status) {
         postData.status = status;
       }
+
+      // Handle publishAt - convert empty string to null for API
+      if (postData.publishAt === '' || !postData.publishAt) {
+        postData.publishAt = undefined; // Remove the field entirely if empty
+      } else {
+        // Ensure the date is in correct ISO format
+        try {
+          const date = new Date(postData.publishAt);
+          if (isNaN(date.getTime())) {
+            // Invalid date, remove the field
+            postData.publishAt = undefined;
+          } else {
+            // Convert to ISO string
+            postData.publishAt = date.toISOString();
+          }
+        } catch (error) {
+          console.error('Invalid publishAt date:', postData.publishAt);
+          postData.publishAt = undefined;
+        }
+      }
+
+      // Handle destinationId - convert empty string to null for API
+      if (postData.destinationId === '' || !postData.destinationId) {
+        postData.destinationId = undefined; // Remove the field entirely if empty
+      }
+
+      console.log('Post data being sent:', postData); // Debug log
 
       // Convert seoMeta object to JSON string format for API
       if (postData.seoMeta) {
@@ -204,13 +293,7 @@ const PostForm: React.FC = () => {
           description: postData.seoMeta.description || '',
           keywords: Array.isArray(postData.seoMeta.keywords) ? 
             postData.seoMeta.keywords.join(', ') : 
-            (postData.seoMeta.keywords || ''),
-          ogTitle: postData.seoMeta.ogTitle || '',
-          ogDescription: postData.seoMeta.ogDescription || '',
-          ogImage: postData.seoMeta.ogImage || '',
-          twitterTitle: postData.seoMeta.twitterTitle || '',
-          twitterDescription: postData.seoMeta.twitterDescription || '',
-          twitterImage: postData.seoMeta.twitterImage || ''
+            (postData.seoMeta.keywords || '')
         };
         
         // Convert to JSON string format that matches your database structure
@@ -222,6 +305,11 @@ const PostForm: React.FC = () => {
         await postService.updatePost(id, { id, ...postData } as UpdatePostDto);
       } else {
         await postService.createPost(postData);
+      }
+      
+      // Restore original tenant context if we switched
+      if (originalTenant && originalTenant.id !== selectedTenantId) {
+        await tenantService.selectTenant(originalTenant.id);
       }
 
       navigate('/posts');
@@ -253,7 +341,7 @@ const PostForm: React.FC = () => {
 </figure>\n`;
     
     handleInputChange('body', post.body + imageHtml);
-    setShowImageManager(false);
+    setShowMediaPicker(false);
   };
 
   if (loading) {
@@ -274,6 +362,14 @@ const PostForm: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400">
             {isEdit ? 'Update your existing post' : 'Write and publish your new content'}
           </p>
+          {/* Debug Info for Edit Mode */}
+          {isEdit && id && (
+            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+              <div className="text-blue-700 dark:text-blue-300">
+                Debug: Editing post ID: {id} | Current title: "{post.title}" | Loading: {loading ? 'Yes' : 'No'}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-3">
           <button
@@ -403,152 +499,19 @@ const PostForm: React.FC = () => {
                       placeholder="Brief description of the post..."
                     />
                   </div>
-
-                  {/* Featured Image */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Featured Image
-                    </label>
-                    <div className="flex items-center gap-4">
-                      {post.featuredImageId ? (
-                        <div className="relative">
-                          <img 
-                            src={`/api/v1/media/${post.featuredImageId}`} 
-                            alt="Featured" 
-                            className="w-20 h-20 object-cover rounded-md"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleInputChange('featuredImageId', '')}
-                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md flex items-center justify-center">
-                          <span className="text-gray-400 text-xs">No image</span>
-                        </div>
-                      )}
-                      <div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              try {
-                                // Upload featured image logic here
-                                const formData = new FormData();
-                                formData.append('file', file);
-                                
-                                // Call your media upload API
-                                const response = await fetch('/api/v1/media/upload', {
-                                  method: 'POST',
-                                  body: formData,
-                                });
-                                
-                                if (response.ok) {
-                                  const result = await response.json();
-                                  handleInputChange('featuredImageId', result.data?.id || result.id);
-                                } else {
-                                  console.error('Upload failed');
-                                }
-                              } catch (error) {
-                                console.error('Upload error:', error);
-                              }
-                            }
-                          }}
-                          className="hidden"
-                          id="featuredImageInput"
-                        />
-                        <label
-                          htmlFor="featuredImageInput"
-                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer inline-block"
-                        >
-                          Choose Image
-                        </label>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Upload a featured image for your post
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Content */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Content
                     </label>
-                    
-                    {/* Toggle between editor modes */}
-                    <div className="mb-2">
-                      <div className="flex gap-2 items-center">
-                        <button
-                          type="button"
-                          onClick={() => setEditorMode('visual')}
-                          className={`px-3 py-1 text-sm rounded ${
-                            editorMode === 'visual' 
-                              ? 'bg-blue-600 text-white' 
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                        >
-                          Visual Editor
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditorMode('html')}
-                          className={`px-3 py-1 text-sm rounded ${
-                            editorMode === 'html' 
-                              ? 'bg-blue-600 text-white' 
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
-                        >
-                          HTML Source
-                        </button>
-                        
-                        {/* Image Manager Button */}
-                        <div className="ml-4 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowImageManager(true)}
-                            className="flex items-center gap-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                          >
-                            <Image size={14} />
-                            Insert Image
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
                     <div className="border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
-                      {/* Debug information */}
-                      {post.body && (
-                        <div className="mb-2 p-2 bg-gray-50 dark:bg-gray-700 text-xs">
-                          <details>
-                            <summary>Debug: Raw HTML content</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-xs">
-                              {post.body}
-                            </pre>
-                          </details>
-                        </div>
-                      )}
+                        <ContentEditor
+                          key={`editor-${id || 'new'}-${post.body?.length || 0}`}
+                          value={post.body || ''}
+                          onChange={(value: string) => handleInputChange('body', value)}
+                          placeholder="Write your post content here..."
+                        />
 
-                      {/* HTML Source Mode */}
-                      {editorMode === 'html' ? (
-                        <textarea
-                          value={post.body || ''}
-                          onChange={(e) => handleInputChange('body', e.target.value)}
-                          className="w-full h-96 p-4 font-mono text-sm border-none resize-none focus:outline-none dark:bg-gray-800 dark:text-white"
-                          placeholder="Enter HTML content here..."
-                        />
-                      ) : (
-                        /* Visual Editor Mode */
-                        <HTMLEditor
-                          value={post.body || ''}
-                          onChange={(value) => handleInputChange('body', value)}
-                        />
-                      )}
                     </div>
 
                   </div>
@@ -606,21 +569,13 @@ const PostForm: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Focus Keywords
                     </label>
-                    <input
-                      type="text"
-                      value={Array.isArray(post.seoMeta?.keywords) 
-                        ? post.seoMeta.keywords.join(', ') 
-                        : (post.seoMeta?.keywords || '')
-                      }
-                      onChange={(e) => {
-                        const keywords = e.target.value.split(',').map(k => k.trim()).filter(k => k);
-                        handleSeoChange('keywords', keywords);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                      placeholder="keyword1, keyword2, keyword3..."
+                    <KeywordInput
+                      keywords={Array.isArray(post.seoMeta?.keywords) ? post.seoMeta.keywords : []}
+                      onChange={(keywords) => handleSeoChange('keywords', keywords)}
+                      placeholder="Enter focus keywords and press Enter or Space to add them"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Keywords type: {Array.isArray(post.seoMeta?.keywords) ? 'Array' : typeof post.seoMeta?.keywords}
+                      Enter keywords one by one and press Enter, Space, or comma to add them. Use keywords that best describe your content.
                     </p>
                   </div>
 
@@ -637,77 +592,66 @@ const PostForm: React.FC = () => {
                     />
                   </div>
 
-                  {/* Open Graph */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Open Graph (Facebook)</h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          OG Title
-                        </label>
-                        <input
-                          type="text"
-                          value={post.seoMeta?.ogTitle || ''}
-                          onChange={(e) => handleSeoChange('ogTitle', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                          placeholder="Facebook share title..."
-                        />
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          OG Description
-                        </label>
-                        <textarea
-                          value={post.seoMeta?.ogDescription || ''}
-                          onChange={(e) => handleSeoChange('ogDescription', e.target.value)}
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                          placeholder="Facebook share description..."
-                        />
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Twitter */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Twitter Cards</h3>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Twitter Title
-                        </label>
-                        <input
-                          type="text"
-                          value={post.seoMeta?.twitterTitle || ''}
-                          onChange={(e) => handleSeoChange('twitterTitle', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                          placeholder="Twitter share title..."
-                        />
-                      </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Twitter Description
-                        </label>
-                        <textarea
-                          value={post.seoMeta?.twitterDescription || ''}
-                          onChange={(e) => handleSeoChange('twitterDescription', e.target.value)}
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                          placeholder="Twitter share description..."
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
               {/* Settings Tab */}
               {activeTab === 'settings' && (
                 <div className="space-y-6">
+                  {/* Admin Tenant Selection */}
+                  {isAdmin && tenants.length > 0 && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
+                        Admin Settings
+                      </h3>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Target Tenant <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={selectedTenantId}
+                          onChange={(e) => setSelectedTenantId(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                          required
+                        >
+                          <option value="">Select a tenant...</option>
+                          {tenants.map((tenant) => (
+                            <option key={tenant.id} value={tenant.id}>
+                              {tenant.name || tenant.slug || tenant.domain}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          As an admin, you can create posts for any tenant. Select the tenant where this post should be published.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Destination
+                    </label>
+                    <select
+                      value={post.destinationId}
+                      onChange={(e) => handleInputChange('destinationId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="">Select a destination...</option>
+                      {destinations.map((destination) => (
+                        <option key={destination.id} value={destination.id}>
+                          {destination.name} ({[destination.city, destination.country].filter(Boolean).join(', ') || 'No location'})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Select where this post should be published
+                    </p>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Status
@@ -730,10 +674,18 @@ const PostForm: React.FC = () => {
                       </label>
                       <input
                         type="datetime-local"
-                        value={post.publishAt}
+                        value={
+                          post.publishAt && post.publishAt !== '' 
+                            ? new Date(post.publishAt).toISOString().slice(0, 16)
+                            : ''
+                        }
                         onChange={(e) => handleInputChange('publishAt', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        min={new Date().toISOString().slice(0, 16)} // Prevent scheduling in the past
                       />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Select when this post should be published
+                      </p>
                     </div>
                   )}
 
@@ -811,14 +763,81 @@ const PostForm: React.FC = () => {
               </div>
             </div>
           </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+             {/* Featured Image */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Featured Image
+                    </label>
+                    <div className="flex flex-col items-center gap-4">
+                      {featuredImage ? (
+                        <div className="relative">
+                          <img 
+                            src={featuredImage.url} 
+                            alt={featuredImage.alt || "Featured"} 
+                            className="w-auto h-30 object-cover rounded-md"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFeaturedImage(null);
+                              handleInputChange('featuredImageId', '');
+                            }}
+                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-40 h-40 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md flex items-center justify-center">
+                          <Image size={40} className="text-gray-400" />
+                        </div>
+                      )}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setShowFeaturedImagePicker(true)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          {featuredImage ? 'Change Image' : 'Choose Image'}
+                        </button>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Select a featured image from your media library or upload a new one
+                        </p>
+                      </div>
+                    </div>  
+                  </div>
+          </div>
         </div>
       </div>
       
-      {/* Image Manager Modal */}
-      <ImageManager
-        isOpen={showImageManager}
-        onClose={() => setShowImageManager(false)}
-        onSelectImage={handleInsertImage}
+      {/* Featured Image Picker Modal */}
+      <FeaturedImagePicker
+        isOpen={showFeaturedImagePicker}
+        onClose={() => setShowFeaturedImagePicker(false)}
+        onSelect={(media) => {
+          setFeaturedImage(media);
+          setPost(prev => ({ ...prev, featuredImageId: media.id }));
+          setShowFeaturedImagePicker(false);
+        }}
+        selectedMediaId={post.featuredImageId}
+      />
+
+      {/* Media Picker Modal for Content */}
+      <MediaPickerModal
+        isOpen={showMediaPicker}
+        onClose={() => setShowMediaPicker(false)}
+        onSelect={(media) => {
+          if (Array.isArray(media)) {
+            // Handle multiple selection
+            media.forEach(item => handleInsertImage(item.url, item.alt || ''));
+          } else {
+            // Handle single selection
+            handleInsertImage(media.url, media.alt || '');
+          }
+          setShowMediaPicker(false);
+        }}
       />
     </div>
   );

@@ -31,8 +31,23 @@ class PostService {
     return response.data;
   }
 
-  async getPost(id: string): Promise<ApiResponse<PostDto>> {
-    const response = await apiClient.get(`${this.baseUrl}/${id}`);
+  async getPost(id: string, options?: { forceRefresh?: boolean }): Promise<ApiResponse<PostDto>> {
+    const config: any = {};
+    
+    if (options?.forceRefresh) {
+      config.headers = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Force-Refresh': 'true'
+      };
+      config.params = {
+        _t: Date.now(),
+        _refresh: 'true'
+      };
+    }
+    
+    const response = await apiClient.get(`${this.baseUrl}/${id}`, config);
     return response.data;
   }
 

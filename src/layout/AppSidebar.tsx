@@ -73,6 +73,7 @@ const navItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     subItems: [
       { name: "Comments", path: "/cms/comments", pro: false },
+      { name: "Destinations", path: "/destinations", pro: false },
       { name: "Tenants", path: "/cms/tenants", pro: true },
     ],
   },
