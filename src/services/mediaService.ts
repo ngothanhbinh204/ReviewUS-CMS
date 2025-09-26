@@ -15,7 +15,7 @@ import {
 } from '../types/media.types';
 
 export class MediaService {
-  private baseUrl = '/media';
+  private baseUrl = '/media'; // Use /api/media for GCS integration
   
   // =================================================================
   // MEDIA CRUD OPERATIONS

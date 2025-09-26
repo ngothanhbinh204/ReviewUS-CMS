@@ -162,13 +162,18 @@ class PostService {
 
   // 🛠️ UTILITY METHODS
   generateSlug(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim();
-  }
+  return title
+    .normalize("NFD") // chuẩn hoá unicode, tách dấu
+    .replace(/[\u0300-\u036f]/g, "") // xoá dấu
+    .replace(/đ/g, "d") // thay đ -> d
+    .replace(/Đ/g, "D") // thay Đ -> D
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "") // bỏ ký tự đặc biệt
+    .replace(/\s+/g, "-") // khoảng trắng -> -
+    .replace(/-+/g, "-") // gộp nhiều dấu - thành 1
+    .replace(/^-+|-+$/g, ""); // xoá - ở đầu/cuối
+}
+
 
   validatePost(data: CreatePostDto | UpdatePostDto): string[] {
     const errors: string[] = [];

@@ -231,7 +231,7 @@ const PostsList: React.FC = () => {
                       )}
                       <div>
                         <Link 
-                          to={`/posts/${post.id}`}
+                          to={`/posts/${post.id}/edit`}
                           className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
                         >
                           {post.title}

@@ -24,13 +24,13 @@ const PostsPage: React.FC = () => {
           <Route path="/new" element={<PostForm />} />
           
           {/* Edit Existing Post */}
-          <Route path="/:postId/edit" element={<PostForm />} />
+          <Route path="/:id/edit" element={<PostForm />} />
           
           {/* Post Revisions */}
-          <Route path="/:postId/revisions" element={<PostRevisions />} />
+          <Route path="/:id/revisions" element={<PostRevisions />} />
           
           {/* Compare Revisions */}
-          <Route path="/:postId/revisions/compare" element={<RevisionCompare />} />
+          <Route path="/:id/revisions/compare" element={<RevisionCompare />} />
           
           {/* Default redirect */}
           <Route path="*" element={<Navigate to="/posts" replace />} />

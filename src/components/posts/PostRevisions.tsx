@@ -4,7 +4,7 @@ import { postService } from '../../services/postService';
 import { PostRevisionListDto, RevisionQueryParams, PostDto } from '../../types/post.types';
 
 const PostRevisions: React.FC = () => {
-  const { postId } = useParams();
+  const { id } = useParams();
   const [post, setPost] = useState<PostDto | null>(null);
   const [revisions, setRevisions] = useState<PostRevisionListDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,16 +25,16 @@ const PostRevisions: React.FC = () => {
   });
 
   useEffect(() => {
-    if (postId) {
+    if (id) {
       fetchPost();
       fetchRevisions();
     }
-  }, [postId, filters]);
+  }, [id, filters]);
 
   const fetchPost = async () => {
-    if (!postId) return;
+    if (!id) return;
     try {
-      const response = await postService.getPost(postId);
+      const response = await postService.getPost(id);
       setPost(response.data || null);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch post');
@@ -42,10 +42,10 @@ const PostRevisions: React.FC = () => {
   };
 
   const fetchRevisions = async () => {
-    if (!postId) return;
+    if (!id) return;
     try {
       setLoading(true);
-      const response = await postService.getRevisions(postId, filters);
+      const response = await postService.getRevisions(id, filters);
       setRevisions(response.data || []);
       
       // Update pagination from response  
@@ -69,13 +69,13 @@ const PostRevisions: React.FC = () => {
   };
 
   const handleRevert = async (revisionId: number) => {
-    if (!postId) return;
+    if (!id) return;
     
     const confirmed = window.confirm('Are you sure you want to revert to this revision? This will create a new revision with the selected content.');
     if (!confirmed) return;
 
     try {
-      await postService.revertToRevision(postId, revisionId, {
+      await postService.revertToRevision(id, revisionId, {
         revisionNotes: 'Reverted to previous revision'
       });
       fetchRevisions(); // Refresh the list
@@ -92,7 +92,7 @@ const PostRevisions: React.FC = () => {
     }
     
     const [from, to] = selectedRevisions.sort((a, b) => a - b);
-    window.open(`/posts/${postId}/revisions/compare?from=${from}&to=${to}`, '_blank');
+    window.open(`/posts/${id}/revisions/compare?from=${from}&to=${to}`, '_blank');
   };
 
   const handleRevisionSelect = (revisionId: number) => {
@@ -108,13 +108,13 @@ const PostRevisions: React.FC = () => {
   };
 
   const handleDeleteRevision = async (revisionId: number) => {
-    if (!postId) return;
+    if (!id) return;
     
     const confirmed = window.confirm('Are you sure you want to delete this revision? This action cannot be undone.');
     if (!confirmed) return;
 
     try {
-      await postService.deleteRevision(postId, revisionId);
+      await postService.deleteRevision(id, revisionId);
       fetchRevisions(); // Refresh the list
     } catch (err: any) {
       setError(err.message || 'Failed to delete revision');
@@ -181,7 +181,7 @@ const PostRevisions: React.FC = () => {
           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-1">
             <Link to="/posts" className="hover:text-gray-700 dark:hover:text-gray-300">Posts</Link>
             <span>/</span>
-            <Link to={`/posts/${postId}`} className="hover:text-gray-700 dark:hover:text-gray-300">
+            <Link to={`/posts/${id}`} className="hover:text-gray-700 dark:hover:text-gray-300">
               {post?.title || 'Post'}
             </Link>
             <span>/</span>
@@ -203,7 +203,7 @@ const PostRevisions: React.FC = () => {
             Compare Selected ({selectedRevisions.length}/2)
           </button>
           <Link
-            to={`/posts/${postId}/edit`}
+            to={`/posts/${id}/edit`}
             className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
           >
             Edit Post
@@ -332,7 +332,7 @@ const PostRevisions: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Link
-                        to={`/posts/${postId}/revisions/${revision.id}`}
+                        to={`/posts/${id}/revisions/${revision.id}`}
                         className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
                       >
                         View

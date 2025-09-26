@@ -78,9 +78,9 @@ const Header: React.FC<HeaderProps> = ({ onClick, onToggle }) => {
               />
             </svg>
           </button>
-          <div className="testtttt">
+          {/* <div className="testtttt">
               <TenantSelector />
-            </div>
+            </div> */}
 
           <Link to="/" className="lg:hidden">
             <img

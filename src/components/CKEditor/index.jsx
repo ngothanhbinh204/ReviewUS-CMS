@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import PropTypes from "prop-types";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "ckeditor5-build-classic-dna";
-// import uploadFile from "../../../public/lib/upload";
+import uploadFile from "../../../public/lib/upload";
 
 class MyUploadAdapter {
   constructor(loader) {

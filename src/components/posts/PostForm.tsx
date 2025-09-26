@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { postService } from '../../services/postService';
+import { Save, Rocket, FileEdit, Image } from "lucide-react";
+import HTMLEditor from '../common/HTMLEditor';
+import ImageManager from '../media/ImageManager';
+
 import { CreatePostDto, UpdatePostDto, SeoMetaDto } from '../../types/post.types';
-// @ts-ignore
-import CKEditor5 from '../CKEditor/index';
 
 const PostForm: React.FC = () => {
   const navigate = useNavigate();
@@ -41,6 +43,8 @@ const PostForm: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'settings'>('content');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [editorMode, setEditorMode] = useState<'visual' | 'html'>('visual');
+  const [showImageManager, setShowImageManager] = useState(false);
 
   useEffect(() => {
     if (isEdit && id) {
@@ -61,11 +65,75 @@ const PostForm: React.FC = () => {
       console.log('Post data:', postData);
       
       if (postData) {
+        // Parse SEO Meta data if it's a JSON string
+        let parsedSeoMeta = {
+          title: '',
+          description: '',
+          keywords: [],
+          ogTitle: '',
+          ogDescription: '',
+          ogImage: '',
+          twitterTitle: '',
+          twitterDescription: '',
+          twitterImage: ''
+        };
+
+        if (postData.seoMeta) {
+          try {
+            // If seoMeta is a string, parse it
+            if (typeof postData.seoMeta === 'string') {
+              // Handle double-escaped JSON string
+              let cleanJsonString = postData.seoMeta;
+              
+              // Remove outer quotes and unescape
+              if (cleanJsonString.startsWith('"') && cleanJsonString.endsWith('"')) {
+                cleanJsonString = cleanJsonString.slice(1, -1);
+              }
+              
+              // Replace escaped quotes
+              cleanJsonString = cleanJsonString.replace(/\\"/g, '"');
+              
+              console.log('Cleaned JSON string:', cleanJsonString);
+              const parsed = JSON.parse(cleanJsonString);
+              
+              parsedSeoMeta = {
+                title: parsed.title || '',
+                description: parsed.description || '',
+                keywords: Array.isArray(parsed.keywords) ? parsed.keywords : 
+                         (typeof parsed.keywords === 'string' ? parsed.keywords.split(',').map((k: string) => k.trim()) : []),
+                ogTitle: parsed.ogTitle || '',
+                ogDescription: parsed.ogDescription || '',
+                ogImage: parsed.ogImage || '',
+                twitterTitle: parsed.twitterTitle || '',
+                twitterDescription: parsed.twitterDescription || '',
+                twitterImage: parsed.twitterImage || ''
+              };
+            } else if (typeof postData.seoMeta === 'object') {
+              // If it's already an object, use it directly
+              parsedSeoMeta = {
+                title: postData.seoMeta.title || '',
+                description: postData.seoMeta.description || '',
+                keywords: Array.isArray(postData.seoMeta.keywords) ? postData.seoMeta.keywords : 
+                         (typeof postData.seoMeta.keywords === 'string' ? postData.seoMeta.keywords.split(',').map((k: string) => k.trim()) : []),
+                ogTitle: postData.seoMeta.ogTitle || '',
+                ogDescription: postData.seoMeta.ogDescription || '',
+                ogImage: postData.seoMeta.ogImage || '',
+                twitterTitle: postData.seoMeta.twitterTitle || '',
+                twitterDescription: postData.seoMeta.twitterDescription || '',
+                twitterImage: postData.seoMeta.twitterImage || ''
+              };
+            }
+          } catch (parseError) {
+            console.error('Error parsing SEO meta:', parseError);
+            console.log('Raw seoMeta:', postData.seoMeta);
+          }
+        }
+
         const newPostState = {
           title: postData.title,
           slug: postData.slug,
           excerpt: postData.excerpt || '',
-          body: postData.body || '',
+          body: postData.body || '', // Keep HTML as is for CKEditor
           status: postData.status,
           publishAt: postData.publishAt || '',
           destinationId: postData.destinationId || '',
@@ -74,21 +142,13 @@ const PostForm: React.FC = () => {
           metaRobots: postData.metaRobots,
           taxonomyIds: postData.taxonomies?.map((t: any) => t.id) || [],
           mediaIds: postData.media?.map((m: any) => m.id) || [],
-          seoMeta: postData.seoMeta || {
-            title: '',
-            description: '',
-            keywords: [],
-            ogTitle: '',
-            ogDescription: '',
-            ogImage: '',
-            twitterTitle: '',
-            twitterDescription: '',
-            twitterImage: ''
-          }
+          seoMeta: parsedSeoMeta
         };
         
         console.log('Setting post state:', newPostState);
         setPost(newPostState);
+        
+        // Force editor re-render to load new content
       } else {
         console.error('No post data received');
         setError('Post not found');
@@ -137,6 +197,27 @@ const PostForm: React.FC = () => {
         postData.status = status;
       }
 
+      // Convert seoMeta object to JSON string format for API
+      if (postData.seoMeta) {
+        const seoMetaJson = {
+          title: postData.seoMeta.title || '',
+          description: postData.seoMeta.description || '',
+          keywords: Array.isArray(postData.seoMeta.keywords) ? 
+            postData.seoMeta.keywords.join(', ') : 
+            (postData.seoMeta.keywords || ''),
+          ogTitle: postData.seoMeta.ogTitle || '',
+          ogDescription: postData.seoMeta.ogDescription || '',
+          ogImage: postData.seoMeta.ogImage || '',
+          twitterTitle: postData.seoMeta.twitterTitle || '',
+          twitterDescription: postData.seoMeta.twitterDescription || '',
+          twitterImage: postData.seoMeta.twitterImage || ''
+        };
+        
+        // Convert to JSON string format that matches your database structure
+        (postData as any).seoMeta = JSON.stringify(seoMetaJson);
+        console.log('SEO Meta being sent:', (postData as any).seoMeta);
+      }
+
       if (isEdit && id) {
         await postService.updatePost(id, { id, ...postData } as UpdatePostDto);
       } else {
@@ -157,6 +238,22 @@ const PostForm: React.FC = () => {
 
   const handleDraft = () => {
     handleSave('draft');
+  };
+
+  const handleInsertImage = (imageUrl: string, alt?: string) => {
+    // imageUrl is now already the full GCS URL from the API response
+    const imageHtml = `\n<figure class="image">
+  <img 
+    src="${imageUrl}" 
+    alt="${alt || 'Image'}" 
+    style="max-width: 100%; height: auto;" 
+    loading="lazy"
+  />
+  <figcaption>${alt || 'Image caption'}</figcaption>
+</figure>\n`;
+    
+    handleInputChange('body', post.body + imageHtml);
+    setShowImageManager(false);
   };
 
   if (loading) {
@@ -337,9 +434,30 @@ const PostForm: React.FC = () => {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => {
-                            // Handle image upload here
-                            console.log('Image upload:', e.target.files?.[0]);
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                // Upload featured image logic here
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                
+                                // Call your media upload API
+                                const response = await fetch('/api/v1/media/upload', {
+                                  method: 'POST',
+                                  body: formData,
+                                });
+                                
+                                if (response.ok) {
+                                  const result = await response.json();
+                                  handleInputChange('featuredImageId', result.data?.id || result.id);
+                                } else {
+                                  console.error('Upload failed');
+                                }
+                              } catch (error) {
+                                console.error('Upload error:', error);
+                              }
+                            }
                           }}
                           className="hidden"
                           id="featuredImageInput"
@@ -362,16 +480,77 @@ const PostForm: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Content
                     </label>
-                    <div className="border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
-                      <CKEditor5
-                        value={post.body || ''}
-                        onChange={(data: string) => handleInputChange('body', data)}
-                        accessToken="your-access-token"
-                        onUpload={(data: any) => {
-                          console.log('Image uploaded:', data);
-                        }}
-                      />
+                    
+                    {/* Toggle between editor modes */}
+                    <div className="mb-2">
+                      <div className="flex gap-2 items-center">
+                        <button
+                          type="button"
+                          onClick={() => setEditorMode('visual')}
+                          className={`px-3 py-1 text-sm rounded ${
+                            editorMode === 'visual' 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          Visual Editor
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditorMode('html')}
+                          className={`px-3 py-1 text-sm rounded ${
+                            editorMode === 'html' 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          HTML Source
+                        </button>
+                        
+                        {/* Image Manager Button */}
+                        <div className="ml-4 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowImageManager(true)}
+                            className="flex items-center gap-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            <Image size={14} />
+                            Insert Image
+                          </button>
+                        </div>
+                      </div>
                     </div>
+
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+                      {/* Debug information */}
+                      {post.body && (
+                        <div className="mb-2 p-2 bg-gray-50 dark:bg-gray-700 text-xs">
+                          <details>
+                            <summary>Debug: Raw HTML content</summary>
+                            <pre className="mt-2 whitespace-pre-wrap text-xs">
+                              {post.body}
+                            </pre>
+                          </details>
+                        </div>
+                      )}
+
+                      {/* HTML Source Mode */}
+                      {editorMode === 'html' ? (
+                        <textarea
+                          value={post.body || ''}
+                          onChange={(e) => handleInputChange('body', e.target.value)}
+                          className="w-full h-96 p-4 font-mono text-sm border-none resize-none focus:outline-none dark:bg-gray-800 dark:text-white"
+                          placeholder="Enter HTML content here..."
+                        />
+                      ) : (
+                        /* Visual Editor Mode */
+                        <HTMLEditor
+                          value={post.body || ''}
+                          onChange={(value) => handleInputChange('body', value)}
+                        />
+                      )}
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -379,6 +558,20 @@ const PostForm: React.FC = () => {
               {/* SEO Tab */}
               {activeTab === 'seo' && (
                 <div className="space-y-6">
+                  {/* Debug SEO Meta */}
+                  {post.seoMeta && (
+                    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+                      <details>
+                        <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                          Debug: SEO Meta Data
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                          {JSON.stringify(post.seoMeta, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Meta Title
@@ -415,11 +608,20 @@ const PostForm: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      value={post.seoMeta?.keywords?.join(', ') || ''}
-                      onChange={(e) => handleSeoChange('keywords', e.target.value.split(',').map(k => k.trim()).filter(k => k))}
+                      value={Array.isArray(post.seoMeta?.keywords) 
+                        ? post.seoMeta.keywords.join(', ') 
+                        : (post.seoMeta?.keywords || '')
+                      }
+                      onChange={(e) => {
+                        const keywords = e.target.value.split(',').map(k => k.trim()).filter(k => k);
+                        handleSeoChange('keywords', keywords);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                       placeholder="keyword1, keyword2, keyword3..."
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Keywords type: {Array.isArray(post.seoMeta?.keywords) ? 'Array' : typeof post.seoMeta?.keywords}
+                    </p>
                   </div>
 
                   <div>
@@ -561,30 +763,30 @@ const PostForm: React.FC = () => {
           {/* Quick Actions */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <h3 className="font-medium text-gray-900 dark:text-white mb-3">Quick Actions</h3>
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <button
+              onClick={handleDraft}
+              disabled={saving}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded disabled:opacity-50 flex items-center gap-2"
+            >
+              <Save size={16} /> Save as Draft
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={saving}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded disabled:opacity-50 flex items-center gap-2"
+            >
+              <Rocket size={16} /> Publish Now
+            </button>
+            {isEdit && (
               <button
-                onClick={handleDraft}
-                disabled={saving}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded disabled:opacity-50"
+                onClick={() => navigate(`/posts/${id}/revisions`)}
+                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded flex items-center gap-2"
               >
-                💾 Save as Draft
+                <FileEdit size={16} /> View Revisions
               </button>
-              <button
-                onClick={handlePublish}
-                disabled={saving}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded disabled:opacity-50"
-              >
-                🚀 Publish Now
-              </button>
-              {isEdit && (
-                <button
-                  onClick={() => navigate(`/v1/posts/${id}/revisions`)}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
-                >
-                  📝 View Revisions
-                </button>
-              )}
-            </div>
+            )}
+          </div>
           </div>
 
           {/* SEO Score */}
@@ -611,6 +813,13 @@ const PostForm: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Image Manager Modal */}
+      <ImageManager
+        isOpen={showImageManager}
+        onClose={() => setShowImageManager(false)}
+        onSelectImage={handleInsertImage}
+      />
     </div>
   );
 };

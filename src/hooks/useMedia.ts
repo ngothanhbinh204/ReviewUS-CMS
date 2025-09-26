@@ -14,7 +14,6 @@ import {
   MediaAnalyticsDto,
   MediaShareDto
 } from '../types/media.types';
-import { ApiResponse, PagedApiResponse } from '../types/api.types';
 
 // =================================================================
 // MAIN MEDIA HOOK
@@ -45,38 +44,45 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
     setState(prev => ({ ...prev, loading: 'loading', error: null }));
     
     try {
-      const response: PagedApiResponse<MediaDto> = await mediaService.getMedia({
+      const response = await mediaService.getMedia({
         ...state.filters,
         ...params
-      });
+      }) as any; // Use any to handle actual API response structure
 
-      if (response.success && response.data) {
+      console.log('MediaService response:', response); // Debug log
+
+      // Handle actual API response structure: { items: [], totalCount: number, ... }
+      if (response && (response.items || response.data)) {
+        const mediaItems = response.items || response.data || [];
+        
         setState(prev => ({
           ...prev,
-          items: response.data || [],
+          items: Array.isArray(mediaItems) ? mediaItems : [],
           loading: 'success',
           pagination: {
-            pageNumber: response.pageNumber,
-            totalPages: response.totalPages,
-            totalCount: response.totalCount,
-            pageSize: response.pageSize,
-            hasPreviousPage: response.hasPreviousPage,
-            hasNextPage: response.hasNextPage
+            pageNumber: response.pageNumber || 1,
+            totalPages: response.totalPages || Math.ceil((response.totalCount || 0) / (response.pageSize || 20)),
+            totalCount: response.totalCount || 0,
+            pageSize: response.pageSize || 20,
+            hasPreviousPage: (response.pageNumber || 1) > 1,
+            hasNextPage: (response.pageNumber || 1) < (response.totalPages || Math.ceil((response.totalCount || 0) / (response.pageSize || 20)))
           },
           filters: { ...prev.filters, ...params }
         }));
       } else {
+        console.error('API response error:', response);
         setState(prev => ({
           ...prev,
           loading: 'error',
-          error: response.message || 'Failed to fetch media'
+          error: response?.message || 'Failed to fetch media'
         }));
       }
     } catch (error: any) {
+      console.error('Network error:', error);
       setState(prev => ({
         ...prev,
         loading: 'error',
-        error: error.message || 'An error occurred while fetching media'
+        error: error.message || 'Network error occurred while fetching media'
       }));
     }
   }, [state.filters]);
@@ -97,14 +103,32 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
       );
 
       const results = await Promise.allSettled(uploadPromises);
+      console.log('Upload results:', results); // Debug log
+
       const successful = results
-        .filter((result): result is PromiseFulfilledResult<ApiResponse<MediaDto>> => 
-          result.status === 'fulfilled' && result.value.success
-        )
-        .map(result => result.value.data!)
+        .filter((result): result is PromiseFulfilledResult<any> => {
+          if (result.status !== 'fulfilled') return false;
+          // Check if upload was successful - either has success field or has data
+          const response = result.value;
+          return Boolean((response.success === true) || (response.data && response.data.id));
+        })
+        .map(result => {
+          const response = result.value;
+          return response.data || response; // Get the media data
+        })
         .filter(Boolean);
 
-      const failed = results.filter(result => result.status === 'rejected').length;
+      const failed = results.filter(result => {
+        if (result.status === 'rejected') return true;
+        if (result.status === 'fulfilled') {
+          const response = result.value;
+          // Consider failed if no success and no data with id
+          return !(response.success === true || (response.data && response.data.id));
+        }
+        return false;
+      }).length;
+
+      console.log('Upload summary:', { successful: successful.length, failed }); // Debug log
 
       if (successful.length > 0) {
         setState(prev => ({
@@ -124,15 +148,24 @@ export const useMedia = (initialParams?: MediaQueryParams) => {
         await fetchMedia();
       }
 
-      if (failed > 0) {
+      if (failed > 0 && successful.length === 0) {
+        // Only show error if all uploads failed
         setState(prev => ({
           ...prev,
-          error: `${failed} file(s) failed to upload`
+          loading: 'error',
+          error: `All ${failed} file(s) failed to upload`
+        }));
+      } else if (failed > 0) {
+        // Show warning if some failed
+        setState(prev => ({
+          ...prev,
+          error: `${failed} file(s) failed to upload, ${successful.length} succeeded`
         }));
       }
 
       return { successful: successful.length, failed };
     } catch (error: any) {
+      console.error('Upload error:', error);
       setState(prev => ({
         ...prev,
         loading: 'error',
