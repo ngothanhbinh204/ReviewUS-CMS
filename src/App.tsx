@@ -46,6 +46,7 @@ import { MediaManagementPage } from "./pages/Media";
 // Destinations Management Components
 import DestinationList from "./components/destinations/DestinationList";
 import DestinationForm from "./components/destinations/DestinationForm";
+import PostLayoutManagerPage from "./pages/posts/PostLayoutManagerPage";
 
 // import ViewBlog from "./pages/Blog/ViewBlog";
 
@@ -96,6 +97,8 @@ export default function App() {
 
               {/* Posts CRUD with Revision System */}
               <Route path="/posts/*" element={<PostsPage />} />
+              {/* Post Layout Manager */}
+              <Route path="/posts/layouts" element={<PostLayoutManagerPage />} />
               <Route path="/posts/analytics" element={<PostAnalyticsPage />} />
 
               {/* Media Management System */}

@@ -4,6 +4,7 @@ import PostsList from '../components/posts/PostsList';
 import PostForm from '../components/posts/PostForm';
 import PostRevisions from '../components/posts/PostRevisions';
 import RevisionCompare from '../components/posts/RevisionCompare';
+import PostLayoutManagerPage from './posts/PostLayoutManagerPage';
 
 // Loading component
 const LoadingSpinner = () => (
@@ -20,6 +21,7 @@ const PostsPage: React.FC = () => {
           {/* Posts List */}
           <Route path="/" element={<PostsList />} />
           
+ 
           {/* Create New Post */}
           <Route path="/new" element={<PostForm />} />
           

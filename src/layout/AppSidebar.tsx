@@ -82,6 +82,7 @@ const navItems: NavItem[] = [
     icon: <PageIcon />,
     subItems: [
       { name: "All Posts", path: "/posts", pro: false },
+      { name: "Posts Layouts", path: "/posts/layouts", pro: false },
       { name: "Create New", path: "/posts/new", pro: false },
       { name: "Analytics", path: "/posts/analytics", pro: true, new: true },
     ],
