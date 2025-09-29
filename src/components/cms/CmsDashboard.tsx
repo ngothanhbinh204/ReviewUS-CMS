@@ -65,7 +65,7 @@ const CmsDashboard: React.FC = () => {
   ];
 
   // Add tenants for super admin
-  if (user.role === 'super_admin') {
+  if (user.roles.includes('super_admin')) {
     navigation.push({
       name: 'Tenants',
       href: '/cms/tenants',
@@ -119,15 +119,15 @@ const CmsDashboard: React.FC = () => {
             <div className="flex items-center">
               <div className="w-8 h-8 bg-brand-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-semibold">
-                  {user.name?.charAt(0).toUpperCase() || 'U'}
+                  {user.displayName?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {user.name}
+                  {user.displayName}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {user.role}
+                  {user.roles[0] || 'user'}
                 </p>
               </div>
             </div>
@@ -154,7 +154,7 @@ const CmsDashboard: React.FC = () => {
               <Route path="/comments" element={<CommentsList />} />
 
               {/* Tenants Route (Super Admin only) */}
-              {user.role === 'super_admin' && (
+              {user.roles.includes('super_admin') && (
                 <Route path="/tenants" element={<TenantsList />} />
               )}
 

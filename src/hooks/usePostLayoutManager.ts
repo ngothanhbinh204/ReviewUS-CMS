@@ -12,7 +12,7 @@ export interface UsePostLayoutManagerReturn {
   isGeneratingBulk: boolean;
   currentPage: number;
   searchTerm: string;
-  statusFilter: string;
+  dateFilter: string; // Changed from statusFilter to dateFilter
   showPreview: boolean;
   previewData: PostLayoutData | null;
   showEditModal: boolean;
@@ -44,11 +44,14 @@ export interface UsePostLayoutManagerReturn {
   handleEdit: (item: PostLayoutData) => void;
   handleCloseEdit: () => void;
   handleSaveEdit: (updatedData: PostLayoutData) => void;
+  handleSearch: (term: string) => void;
+  handleDateFilter: (date: string) => void; // Changed from handleStatusFilter
+  handlePageChange: (page: number) => void;
   
   // Setters
   setCurrentPage: (page: number) => void;
   setSearchTerm: (term: string) => void;
-  setStatusFilter: (status: string) => void;
+  setDateFilter: (date: string) => void;
   exportData: () => void;
 }
 
@@ -61,7 +64,7 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
   const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all'); // Changed from statusFilter
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<PostLayoutData | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -80,13 +83,39 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
     processing: 0
   });
 
-  // Computed values
+  // Computed values with date filtering
   const filteredData = layoutData.filter(item => {
     const matchesSearch = item.outline.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.meta_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.keyword.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    if (dateFilter === 'all') {
+      return matchesSearch;
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const itemDate = item.import_date || item.created_at?.split('T')[0] || today;
+    
+    let matchesDate = false;
+    switch (dateFilter) {
+      case 'today':
+        matchesDate = itemDate === today;
+        break;
+      case 'yesterday':
+        matchesDate = itemDate === yesterday;
+        break;
+      case 'this_week':
+        matchesDate = itemDate >= weekAgo;
+        break;
+      default:
+        // Custom date filter (YYYY-MM-DD format)
+        matchesDate = itemDate === dateFilter;
+    }
+    
+    return matchesSearch && matchesDate;
   });
 
   const paginatedData = filteredData.slice(
@@ -104,12 +133,29 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
     generating: layoutData.filter(item => item.status === 'generating').length,
     error: layoutData.filter(item => item.status === 'error').length,
     need_generate: layoutData.filter(item => item.status === 'need_generate').length,
+    
+    // Date-based stats
+    today: layoutData.filter(item => {
+      const today = new Date().toISOString().split('T')[0];
+      const itemDate = item.import_date || item.created_at?.split('T')[0] || '';
+      return itemDate === today;
+    }).length,
+    yesterday: layoutData.filter(item => {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const itemDate = item.import_date || item.created_at?.split('T')[0] || '';
+      return itemDate === yesterday;
+    }).length,
+    this_week: layoutData.filter(item => {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const itemDate = item.import_date || item.created_at?.split('T')[0] || '';
+      return itemDate >= weekAgo;
+    }).length,
   };
 
   // Reset pagination when filters change   
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, dateFilter]);
 
   // Import from Google Sheets
   const handleImportFromSheets = useCallback(async () => {
@@ -206,7 +252,7 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
         data.id === item.id ? { ...data, status: 'generating' } : data
       ));
 
-      // Create post via service
+      // Create post via service with proper API call
       const createdPost = await postLayoutService.createPost(item);
         
       // Update local state with post ID and created timestamp
@@ -214,14 +260,17 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
         data.id === item.id 
           ? { 
               ...data, 
+              status: 'created',
               api_post_id: createdPost.data.id,
               created_at: new Date().toISOString()
             }
           : data
       ));
 
-      // Trigger n8n for content generation
-      await triggerN8nContentGeneration(item, createdPost.data.id);
+      // Trigger n8n for content generation if needed
+      if (item.status === 'need_generate' || !item.content) {
+        await triggerN8nContentGeneration(item, createdPost.data.id);
+      }
       
       toast.success(`Post "${item.meta_title}" created successfully!`);
     } catch (error) {
@@ -246,8 +295,15 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
 
     setIsCreatingBulk(true);
     const selectedData = layoutData.filter(item => 
-      selectedItems.has(item.id) && (item.status === 'ready' || item.status === 'pending')
+      selectedItems.has(item.id) && 
+      (item.status === 'ready' || item.status === 'pending')
     );
+    
+    if (selectedData.length === 0) {
+      toast.error('No valid posts to create (selected posts are not ready)');
+      setIsCreatingBulk(false);
+      return;
+    }
     
     try {
       let successCount = 0;
@@ -457,7 +513,7 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
     
     // Filters
     searchTerm,
-    statusFilter,
+    dateFilter,
     
     // Computed data
     filteredData,
@@ -469,7 +525,7 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
     
     // Basic handlers
     handleSearch: (term: string) => setSearchTerm(term),
-    handleStatusFilter: (status: string) => setStatusFilter(status),
+    handleDateFilter: (date: string) => setDateFilter(date),
     handlePageChange: (page: number) => setCurrentPage(page),
     
     // Selection handlers
@@ -495,7 +551,7 @@ export const usePostLayoutManager = (itemsPerPage: number = 10): UsePostLayoutMa
     // Legacy setters for backward compatibility
     setCurrentPage,
     setSearchTerm,
-    setStatusFilter,
+    setDateFilter,
     
     // Utility handlers
     exportData,

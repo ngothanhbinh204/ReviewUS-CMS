@@ -1,4 +1,5 @@
 export interface PostLayoutData {
+  // Basic fields from sheets
   id: string;
   outline: string;
   meta_title: string;
@@ -11,25 +12,33 @@ export interface PostLayoutData {
   api_post_id?: string;
   n8n_trigger_id?: string;
   error_message?: string;
-  // New fields for editing
-  title?: string;
-  excerpt?: string;
-  body?: string;
-  type?: string;
+  
+  // All CreatePostDto fields to prevent API errors
+  title?: string; // Will default to meta_title
+  slug?: string;
   authorId?: string;
   authorName?: string;
-  destinationId?: string;
   destinationName?: string;
   featuredImageUrl?: string;
+  commentCount?: number;
+  averageRating?: number;
+  type?: string;
+  excerpt?: string; // Will default to meta_description
+  body?: string; // Will default to content
+  destinationId?: string;
+  publishAt?: string;
+  seoMeta?: Record<string, unknown>;
+  schemaMarkup?: Record<string, unknown>;
+  canonicalUrl?: string;
+  metaRobots?: string;
+  structuredData?: Record<string, unknown>;
   featuredImageId?: string;
   tagIds?: string[];
   categoryIds?: string[];
-  publishAt?: string;
-  canonicalUrl?: string;
-  metaRobots?: string;
-  seoMeta?: Record<string, unknown>;
-  schemaMarkup?: Record<string, unknown>;
-  structuredData?: Record<string, unknown>;
+  
+  // Additional UI fields
+  selected?: boolean;
+  import_date?: string; // For date filtering
 }
 
 export interface ImportStats {
@@ -40,6 +49,9 @@ export interface ImportStats {
   generating: number;
   error: number;
   need_generate: number;
+  today: number;
+  yesterday: number;
+  this_week: number;
 }
 
 export interface CreatePostDto {
@@ -97,8 +109,10 @@ export interface N8nGenerateRequest {
 export interface N8nGenerateResponse {
   success: boolean;
   trigger_id: string;
-  estimated_completion: string;
+  estimated_completion?: string;
   content?: string;
+  message?: string;
+  execution_id?: string;
 }
 
 export interface N8nTriggerRequest {

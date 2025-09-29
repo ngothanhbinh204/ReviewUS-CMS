@@ -40,15 +40,12 @@ const PostLayoutManager: React.FC = () => {
     
     // Filters
     searchTerm,
-    statusFilter,
+    dateFilter,
     
     // Computed data
     filteredData,
     paginatedData,
     stats,
-    
-    // Import stats
-    importStats,
     
     // Actions
     handleImportFromSheets,
@@ -71,8 +68,7 @@ const PostLayoutManager: React.FC = () => {
     // Legacy setters
     setCurrentPage,
     setSearchTerm,
-    setStatusFilter,
-    exportData,
+    setDateFilter,
   } = usePostLayoutManager(10);
 
   // Status badge component
@@ -258,15 +254,18 @@ const PostLayoutManager: React.FC = () => {
               </div>
               <div className="sm:w-48">
                 <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="ready">Ready</option>
-                  <option value="generating">Generating</option>
-                  <option value="created">Created</option>
+                  <option value="all">Tất cả</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="yesterday">Hôm qua</option>
+                  <option value="this_week">Tuần này</option>
+                  <option value="">----- Chọn ngày cụ thể -----</option>
+                  <option value="2024-09-28">28/09/2024</option>
+                  <option value="2024-09-27">27/09/2024</option>
+                  <option value="2024-09-26">26/09/2024</option>
                 </select>
               </div>
             </div>
@@ -311,7 +310,9 @@ const PostLayoutManager: React.FC = () => {
                         <h4 className="text-sm font-medium text-gray-900 truncate">
                           {item.meta_title}
                         </h4>
-                        <StatusBadge status={item.status} />
+                        <div className="flex items-center">
+                          <StatusBadge status={item.status} />
+                        </div>
                       </div>
                       
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">

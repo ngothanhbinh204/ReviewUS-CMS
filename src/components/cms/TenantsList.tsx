@@ -79,7 +79,7 @@ const TenantsList: React.FC = () => {
   });
 
   // Only super admin can access tenants
-  if (!user || user.role !== 'super_admin') {
+  if (!user || !user.roles.includes('super_admin')) {
     return (
       <div className="bg-error-50 text-error-700 p-4 rounded-lg">
         Access denied. Only super administrators can manage tenants.

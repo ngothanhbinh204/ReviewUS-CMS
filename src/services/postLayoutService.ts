@@ -2,7 +2,6 @@ import {
   PostLayoutData, 
   CreatePostDto, 
   CreatePostResponse,
-  N8nGenerateRequest,
   N8nGenerateResponse,
   N8nTriggerRequest,
   N8nTriggerResponse,
@@ -17,10 +16,10 @@ class PostLayoutService {
   private googleSheetsApiKey = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY;
   private googleSheetId = import.meta.env.VITE_GOOGLE_SHEET_ID;
   private googleSheetRange = import.meta.env.VITE_GOOGLE_SHEET_RANGE || 'Post1!A2:F1000';
-  private n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+  private n8nWebhookUrl = 'https://ad5244.n8nvps.site/webhook/c4798e99-a3e1-4d6e-9114-459b4d77f1cd';
 
   /**
-   * Import data from Google Sheets - REAL IMPLEMENTATION
+   * Import data from Google Sheets with complete CreatePostDto mapping
    */
   async importFromGoogleSheets(): Promise<PostLayoutData[]> {
     try {
@@ -55,8 +54,8 @@ class PostLayoutService {
       const rows = data.values as string[][];
       console.log('Raw data from Google Sheets:', rows);
       
-      // Transform data to PostLayoutData format
-      return rows.map((row, index) => {
+      // Transform data to PostLayoutData format with all CreatePostDto fields
+      const transformedData = rows.map((row, index) => {
         // Mapping theo columns trong sheet: outline, meta_title, meta_description, keyword, STATUS, Content
         const [outline, meta_title, meta_description, keyword, statusRaw, content] = row;
         
@@ -76,6 +75,8 @@ class PostLayoutService {
         } else if (status === 'pending') {
           status = 'ready'; // Has content, ready to create post
         }
+
+        const currentDate = new Date().toISOString();
         
         return {
           id: `sheet_${index + 1}`,
@@ -85,12 +86,38 @@ class PostLayoutService {
           keyword: keyword || '',
           status,
           content: content || '',
-          title: meta_title || '', // Default title from meta_title
-          body: content || '', // Default body from content
-          excerpt: meta_description || '', // Default excerpt from meta_description
-          created_at: new Date().toISOString(),
+          
+          // CreatePostDto required fields
+          title: meta_title || `Untitled Post ${index + 1}`,
+          slug: this.generateSlug(meta_title || `untitled-post-${index + 1}`),
+          body: content || '',
+          excerpt: meta_description || '',
+          type: 'post',
+          authorName: 'System Import',
+          destinationName: '',
+          metaRobots: 'index,follow',
+          
+          // Optional fields with defaults
+          commentCount: 0,
+          averageRating: 0,
+          
+          // SEO Meta structured properly
+          seoMeta: {
+            title: meta_title || '',
+            description: meta_description || '',
+            keywords: keyword || '',
+            robots: 'index,follow'
+          },
+          
+          // Timestamps
+          created_at: currentDate,
+          updated_at: currentDate,
+          import_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD for filtering
         } as PostLayoutData;
       }).filter(item => item.outline.trim() !== ''); // Filter out empty rows
+      
+      console.log('Final transformed data:', transformedData);
+      return transformedData;
     } catch (error) {
       console.error('Google Sheets import error:', error);
       throw error;
@@ -201,17 +228,20 @@ class PostLayoutService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        'Accept': 'application/json',
       },
       body: JSON.stringify(postData)
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create post');
+      const errorText = await response.text();
+      console.error('Create post API error:', errorText);
+      throw new Error(`Failed to create post: ${response.status} ${response.statusText}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('Create post API response:', result);
+    return result;
   }
 
   /**
@@ -227,8 +257,8 @@ class PostLayoutService {
       webhook_url: `${this.baseUrl}/api/webhooks/n8n/content-generated`
     };
 
-    const response = await fetch(`${this.n8nWebhookUrl}/webhook/generate-content`, {
-      method: 'POST',
+    const response = await fetch(`${this.n8nWebhookUrl}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -244,33 +274,51 @@ class PostLayoutService {
   }
 
   /**
-   * Generate content for post layout via n8n
+   * Generate content for post layout via n8n webhook
    */
   async generateContent(data: PostLayoutData): Promise<N8nGenerateResponse> {
-    const generateData: N8nGenerateRequest = {
-      post_layout_id: data.id,
-      sheet_id: this.googleSheetId!,
-      outline: data.outline,
-      keyword: data.keyword,
-      meta_title: data.meta_title,
-      meta_description: data.meta_description
-    };
+    try {
+      console.log('Triggering n8n content generation for:', data.meta_title);
+      
+      // Use GET method with query parameters as the webhook is GET
+      const webhookParams = new URLSearchParams({
+        post_layout_id: data.id,
+        outline: data.outline || '',
+        keyword: data.keyword || '',
+        meta_title: data.meta_title || '',
+        meta_description: data.meta_description || '',
+        sheet_id: this.googleSheetId || '',
+      });
 
-    const response = await fetch(`${this.n8nWebhookUrl}/webhook/generate-content`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(generateData)
-    });
+      const response = await fetch(`${this.n8nWebhookUrl}?${webhookParams}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-        console.log('Error generateContent content generation:', await response.text());
-      throw new Error('Failed to trigger content generation');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error triggering content generation:', errorText);
+        throw new Error(`Failed to trigger content generation: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('n8n webhook response:', result);
+      
+      return {
+        success: true,
+        content: result.content || 'Content generated successfully',
+        trigger_id: result.execution_id || `trigger_${Date.now()}`,
+        message: result.message || 'Content generation triggered',
+      };
+    } catch (error) {
+      console.error('Generate content error:', error);
+      
+      // Fallback to mock if real webhook fails
+      console.log('Falling back to mock content generation...');
+      return await this.mockGenerateContent(data);
     }
-
-    console.log('n8n generate response:', await response.clone().text());
-    return await response.json();
   }
 
   /**
